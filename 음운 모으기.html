@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>음운 헌터 - 국어 음운과 문자 학습 게임</title>
+<style>
+/* ======================================================================
+   전체 리셋 & 기본 폰트
+   - 외부 폰트/라이브러리 없이, 시스템 폰트만 사용해서 어떤 크롬북에서도
+     추가 다운로드 없이 즉시 가볍게 실행되도록 함.
+   ====================================================================== */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  background: #1b2b1a;
+  overflow: hidden; /* 스크롤 방지: 게임 화면 고정 */
+  user-select: none;
+  touch-action: none;
+}
+
+/* ======================================================================
+   화면 레이아웃 (전체 컨테이너)
+   ====================================================================== */
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #bfe8ff 0%, #bfe8ff 30%, #eaf9d8 30%);
+}
+
+/* ---------------------- 공통 버튼 스타일 ---------------------- */
+.btn {
+  font-family: inherit; font-weight: 800; cursor: pointer;
+  border: none; border-radius: 14px; padding: 14px 22px; font-size: 16px;
+  background: linear-gradient(180deg,#ffe07a,#ffc93c);
+  color: #5a3a00; box-shadow: 0 5px 0 #b8860b;
+  transition: transform .05s;
+}
+.btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #b8860b; }
+.btn.secondary { background: linear-gradient(180deg,#bfe0ff,#8fc6ff); color:#173a5e; box-shadow:0 5px 0 #4a80b0; }
+.btn.small { padding:8px 14px; font-size:13px; border-radius:10px; }
+
+/* ======================================================================
+   1. 시작 화면 / 모드 선택
+   ====================================================================== */
+#startScreen {
+  position: absolute; inset: 0; z-index: 30;
+  background: radial-gradient(circle at 30% 20%, #4d9de0 0%, #2b6cb0 45%, #1b3d63 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 20px; overflow-y: auto;
+  color: #fff;
+}
+#startScreen h1 {
+  font-size: clamp(30px, 8vw, 46px); margin: 0 0 4px;
+  color: #fff59d; text-shadow: 0 3px 0 #7a5b00, 0 8px 18px rgba(0,0,0,.4);
+  letter-spacing: 2px;
+}
+#startScreen .tagline { font-size: 14px; color: #dff1ff; margin: 0 0 22px; text-align:center;}
+.modeGrid { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; max-width: 640px; }
+.modeCard {
+  width: 180px; background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.35);
+  border-radius: 18px; padding: 16px 14px; text-align: center; cursor: pointer;
+  transition: .15s;
+}
+.modeCard:hover, .modeCard.selected { background: rgba(255,255,255,.28); border-color: #ffe07a; transform: translateY(-3px); }
+.modeCard .icon { font-size: 34px; }
+.modeCard h3 { margin: 8px 0 4px; font-size: 16px; color:#ffe07a; }
+.modeCard p { margin: 0; font-size: 12px; color:#e9f4ff; line-height:1.4; }
+
+#practiceSelectWrap { display:none; max-width: 640px; margin-top: 14px; text-align:center; }
+#practiceSelectWrap select {
+  font-size: 14px; padding: 8px 10px; border-radius: 10px; border: none; margin-top:8px;
+  font-weight:700;
+}
+
+#startBtnRow { margin-top: 22px; display:flex; gap:10px; }
+
+/* ======================================================================
+   2. HUD (상단 정보 바)
+   ====================================================================== */
+#hud {
+  position: relative; z-index: 10;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 8px 10px; background: #2f5233; border-bottom: 3px solid #1c3320;
+}
+.hudPill {
+  background: #3f6d45; color:#eaffe6; border-radius: 10px; padding: 5px 10px;
+  font-size: 12px; font-weight: 800; display:flex; align-items:center; gap:5px;
+  border: 1px solid #1c3320;
+}
+.hudPill b { color: #ffe07a; font-size:14px; }
+#livesWrap { display:flex; gap:2px; font-size:16px; }
+#comboBadge {
+  background:#ff8a3d; color:#4a2400; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:900;
+  display:none;
+}
+#timeAttackBar { flex-basis: 100%; height:8px; background:#1c3320; border-radius:6px; overflow:hidden; display:none; }
+#timeAttackFill { height:100%; width:100%; background:linear-gradient(90deg,#ffe07a,#ff5768); }
+
+/* 미션 표시줄 */
+#missionBanner {
+  position:relative; z-index:10;
+  background: linear-gradient(90deg,#2b4a2f,#3f6d45);
+  color:#fff; text-align:center; padding: 6px 10px 8px;
+  border-bottom: 3px solid #1c3320;
+}
+#missionMain { font-size: clamp(15px,4vw,20px); font-weight:900; color:#fff59d; margin:0; }
+#missionHint { font-size:11px; color:#d8f5d8; margin:2px 0 0; }
+
+/* ======================================================================
+   3. 게임 월드 (맵)
+   - 논리 좌표계 1000 x 600 (5:3) 를 %로 배치해서 반응형 지원.
+   ====================================================================== */
+#worldWrap { flex:1; position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#eaf9d8;}
+#world {
+  position: relative;
+  width: 100%; aspect-ratio: 5 / 3; max-height: 100%;
+  background:
+    radial-gradient(circle at 20% 80%, rgba(255,255,255,.25) 0, transparent 30%),
+    repeating-linear-gradient(45deg, #8fd36a 0 26px, #83c95f 26px 52px);
+  overflow: hidden; border-radius: 0;
+}
+
+/* 맵 오브젝트 공통 (논리좌표 -> % 변환은 JS에서 style.left/top/width/height 로 지정) */
+.mapObj { position:absolute; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+.mapObj.tree { font-size: 5vw; filter: drop-shadow(0 4px 2px rgba(0,0,0,.25)); }
+.mapObj.rock { font-size: 4vw; filter: drop-shadow(0 3px 2px rgba(0,0,0,.25)); }
+.mapObj.pond { background: radial-gradient(circle, #7fd3ff 0%, #3fa9e6 80%); border-radius: 50%; border:4px solid #2b7fb0; }
+.mapObj.flower { font-size: 2.6vw; opacity:.95; }
+
+/* 플레이어(탐험가) */
+#player {
+  position:absolute; width:6%; aspect-ratio:1/1; z-index:5;
+  display:flex; align-items:center; justify-content:center;
+  font-size: 4.4vw; transform: translate(-50%,-50%);
+  filter: drop-shadow(0 4px 3px rgba(0,0,0,.3));
+  transition: transform .08s;
+}
+#player.moving { animation: bob .35s infinite alternate; }
+@keyframes bob { from{ margin-top:0; } to{ margin-top:-4px; } }
+
+/* 글자 캐릭터 */
+.letter {
+  position:absolute; width:9%; aspect-ratio:1/1; z-index:4;
+  transform: translate(-50%,-50%);
+  border-radius: 50%;
+  display:flex; align-items:center; justify-content:center;
+  font-weight:900; font-size: 4vw; color:#22163f;
+  border: 3px solid rgba(255,255,255,.8);
+  box-shadow: 0 4px 8px rgba(0,0,0,.25), inset 0 -4px 0 rgba(0,0,0,.12);
+  animation: idleFloat 1.6s ease-in-out infinite;
+}
+.letter.consonant { background: radial-gradient(circle at 35% 30%, #9fdcff, #3ba7ff); }
+.letter.vowel { background: radial-gradient(circle at 35% 30%, #ffc2c2, #ff6f6f); }
+@keyframes idleFloat { 0%,100%{ margin-top:0;} 50%{ margin-top:-3%;} }
+
+.letter.nearReady { box-shadow: 0 0 0 6px rgba(255,224,122,.75), 0 4px 8px rgba(0,0,0,.25); }
+.letter.catchSuccess { animation: sparkleOut .45s forwards; }
+@keyframes sparkleOut { 0%{transform:translate(-50%,-50%) scale(1); opacity:1;} 100%{transform:translate(-50%,-50%) scale(1.9); opacity:0;} }
+.letter.catchFail { animation: shakeFail .4s; }
+@keyframes shakeFail {
+  0%,100%{ transform:translate(-50%,-50%) rotate(0);}
+  25%{ transform:translate(-56%,-50%) rotate(-8deg);}
+  75%{ transform:translate(-44%,-50%) rotate(8deg);}
+}
+
+/* 점수/오답 팝업 텍스트 */
+.floatPop {
+  position:absolute; z-index:20; font-weight:900; font-size: 3vw;
+  pointer-events:none; animation: popUp .8s ease-out forwards;
+  transform: translate(-50%,-50%);
+  text-shadow: 0 2px 0 rgba(0,0,0,.25);
+}
+@keyframes popUp { 0%{ opacity:1; transform:translate(-50%,-50%) translateY(0);} 100%{ opacity:0; transform:translate(-50%,-50%) translateY(-60px);} }
+
+/* 오답 설명 배너 (화면 상단 중앙) */
+#explainToast {
+  position:absolute; top: 8px; left:50%; transform: translateX(-50%) translateY(-140%);
+  z-index: 25; background:#3a1414; color:#ffdada; border:2px solid #ff5768;
+  padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight:800;
+  white-space: nowrap; transition: transform .25s ease;
+  max-width: 90%; overflow:hidden; text-overflow:ellipsis;
+}
+#explainToast.show { transform: translateX(-50%) translateY(0); }
+
+/* 업적 알림 토스트 */
+#achieveToast {
+  position:absolute; bottom: 14px; left:50%; transform: translateX(-50%) translateY(160%);
+  z-index: 25; background:#2b4a2f; color:#fff59d; border:2px solid #ffe07a;
+  padding: 10px 18px; border-radius: 12px; font-size: 13px; font-weight:800;
+  transition: transform .3s ease; text-align:center;
+}
+#achieveToast.show { transform: translateX(-50%) translateY(0); }
+
+/* ======================================================================
+   4. 모바일 조작 UI (D패드 + 잡기 버튼)
+   ====================================================================== */
+#touchControls {
+  position:absolute; bottom: 14px; left:0; right:0; z-index: 15;
+  display:flex; justify-content: space-between; align-items:flex-end; padding: 0 14px;
+  pointer-events:none;
+}
+#dpad { position:relative; width: 130px; height: 130px; pointer-events:auto; }
+.dbtn {
+  position:absolute; width: 44px; height:44px; border-radius: 12px;
+  background: rgba(0,0,0,.35); color:#fff; border: 2px solid rgba(255,255,255,.5);
+  display:flex; align-items:center; justify-content:center; font-size:20px;
+  user-select:none;
+}
+.dbtn:active { background: rgba(255,224,122,.6); }
+#dUp{ top:0; left:43px; } #dDown{ bottom:0; left:43px; }
+#dLeft{ top:43px; left:0; } #dRight{ top:43px; right:0; }
+
+#catchBtn {
+  pointer-events:auto; width: 84px; height:84px; border-radius:50%;
+  background: radial-gradient(circle at 35% 30%, #fff2b0, #ffc93c);
+  border: 3px solid #b8860b; color:#5a3a00; font-weight:900; font-size:13px;
+  box-shadow: 0 6px 0 #8a6100;
+  display:flex; align-items:center; justify-content:center; text-align:center; line-height:1.1;
+}
+#catchBtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #8a6100; }
+
+@media (min-width: 900px) {
+  #touchControls { opacity:.55; } /* PC에서는 키보드가 주 조작이므로 은은하게 표시 */
+}
+
+/* ======================================================================
+   5. 종료(결과) 화면
+   ====================================================================== */
+#endScreen {
+  position:absolute; inset:0; z-index: 40; display:none;
+  background: rgba(10,20,10,.9); align-items:center; justify-content:center; padding:16px;
+  overflow-y:auto;
+}
+#endScreen .card {
+  background:#2f5233; border:3px solid #ffe07a; border-radius:20px; padding: 24px 22px;
+  max-width: 460px; width:100%; color:#eaffe6; text-align:center;
+  box-shadow: 0 14px 0 #1c3320;
+}
+#endScreen h2 { color:#ffe07a; font-size: 26px; margin:0 0 6px; }
+#endScreen .bigScore { font-size: 34px; font-weight:900; color:#fff; margin: 6px 0; }
+.statLine { display:flex; justify-content:space-between; font-size:13px; padding:5px 4px; border-bottom: 1px dashed #4a7a4f; }
+.statLine b { color:#ffe07a; }
+#achieveList { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin:12px 0; }
+.achieveChip { background:#3f6d45; border:1px solid #ffe07a; border-radius:999px; padding:5px 10px; font-size:11px; }
+.achieveChip.locked { opacity:.35; }
+
+/* 미션 리스트 (틀린 항목 표) */
+table.wrongTable { width:100%; border-collapse:collapse; font-size:11.5px; margin-top:8px; }
+table.wrongTable th, table.wrongTable td { border-bottom:1px solid #4a7a4f; padding:5px 3px; text-align:left; }
+table.wrongTable th { color:#ffe07a; }
+
+/* 반응형: 작은 화면에서 HUD 글자 축소 */
+@media (max-width: 480px) {
+  .hudPill { font-size: 10.5px; padding:4px 7px; }
+  #missionMain { font-size: 15px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- =====================================================
+       시작 화면: 모드 선택
+       ===================================================== -->
+  <div id="startScreen">
+    <h1>🦊 음운 헌터</h1>
+    <p class="tagline">국어 '음운과 문자' 단원을 맵을 뛰어다니며 반복 학습해요!</p>
+
+    <div class="modeGrid">
+      <div class="modeCard selected" data-mode="normal">
+        <div class="icon">🗺️</div>
+        <h3>일반 모드</h3>
+        <p>17개 미션을 순서대로 도전! 목숨 3개, 실수하면 감소해요.</p>
+      </div>
+      <div class="modeCard" data-mode="time">
+        <div class="icon">⏱️</div>
+        <h3>타임어택</h3>
+        <p>미션마다 30초! 시간 안에 다 잡아야 해요.</p>
+      </div>
+      <div class="modeCard" data-mode="practice">
+        <div class="icon">🌱</div>
+        <h3>연습 모드</h3>
+        <p>목숨/시간 제한 없이 원하는 분류를 골라 마음껏 연습해요.</p>
+      </div>
+    </div>
+
+    <div id="practiceSelectWrap">
+      <label style="font-size:13px;">연습할 분류 선택</label><br>
+      <select id="practiceMissionSelect"></select>
+    </div>
+
+    <div id="startBtnRow">
+      <button class="btn" id="startGameBtn">게임 시작!</button>
+    </div>
+  </div>
+
+  <!-- =====================================================
+       HUD (상단 정보)
+       ===================================================== -->
+  <div id="hud">
+    <div class="hudPill">점수 <b id="scoreVal">0</b></div>
+    <div class="hudPill">목숨 <span id="livesWrap"></span></div>
+    <div class="hudPill">남은 목표 <b id="remainVal">0</b></div>
+    <div class="hudPill" id="comboBadge">🔥 콤보 x<span id="comboVal">0</span></div>
+    <div id="timeAttackBar"><div id="timeAttackFill"></div></div>
+  </div>
+
+  <!-- 미션 안내줄 -->
+  <div id="missionBanner">
+    <p id="missionMain">미션을 불러오는 중...</p>
+    <p id="missionHint"></p>
+  </div>
+
+  <!-- =====================================================
+       게임 월드
+       ===================================================== -->
+  <div id="worldWrap">
+    <div id="world">
+      <!-- 맵 오브젝트, 플레이어, 글자는 JS가 동적으로 채워 넣음 -->
+      <div id="player">🦊</div>
+      <div id="explainToast"></div>
+      <div id="achieveToast"></div>
+    </div>
+
+    <!-- 모바일용 가상 조작 UI -->
+    <div id="touchControls">
+      <div id="dpad">
+        <div class="dbtn" id="dUp">▲</div>
+        <div class="dbtn" id="dLeft">◀</div>
+        <div class="dbtn" id="dRight">▶</div>
+        <div class="dbtn" id="dDown">▼</div>
+      </div>
+      <div id="catchBtn">잡기<br>SPACE</div>
+    </div>
+  </div>
+
+  <!-- =====================================================
+       종료 화면
+       ===================================================== -->
+  <div id="endScreen">
+    <div class="card">
+      <h2 id="endTitle">🏆 게임 종료</h2>
+      <div class="bigScore" id="endScore">0점</div>
+      <div class="statLine"><span>정확도</span><b id="endAccuracy">0%</b></div>
+      <div class="statLine"><span>최고 콤보</span><b id="endMaxCombo">0</b></div>
+      <div class="statLine"><span>가장 많이 틀린 분류</span><b id="endWorstCat">-</b></div>
+      <div id="achieveList"></div>
+      <table class="wrongTable" id="wrongTable"></table>
+      <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
+        <button class="btn" id="retryBtn">다시 연습하기</button>
+        <button class="btn secondary" id="menuBtn">메인 메뉴</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================================
+   음운 헌터 - 게임 스크립트
+   전체 구조:
+     1. 음운 데이터 (자음/모음 분류 정보)
+     2. 미션 정의 (17종)
+     3. 게임 상태(state) 객체
+     4. 맵(오브젝트) 초기화
+     5. 시작 화면 / 모드 선택 로직
+     6. 미션 진행 로직 (스폰, 목표 판정)
+     7. 게임 루프 (이동, 충돌, 렌더링)
+     8. 입력 처리 (키보드 + 터치)
+     9. 잡기 판정 (정답/오답)
+    10. 업적 시스템
+    11. 종료 화면 / 통계
+   ========================================================================= */
+(function () {
+"use strict";
+
+/* =========================================================================
+   1. 음운 데이터
+   -------------------------------------------------------------------------
+   pos = 조음 위치 (양순음/치조음/경구개음/연구개음/후음)
+   man = 조음 방법 (파열음/파찰음/마찰음/비음/유음)
+   str = 소리의 세기 (예사소리/된소리/거센소리) - 울림소리(ㄴㅁㅇㄹ)와 ㅎ은 해당 없음(null)
+   ========================================================================= */
+const CONSONANTS = [
+  { ch:'ㄱ', pos:'연구개음', man:'파열음', str:'예사소리' },
+  { ch:'ㄲ', pos:'연구개음', man:'파열음', str:'된소리'   },
+  { ch:'ㅋ', pos:'연구개음', man:'파열음', str:'거센소리' },
+  { ch:'ㄷ', pos:'치조음',   man:'파열음', str:'예사소리' },
+  { ch:'ㄸ', pos:'치조음',   man:'파열음', str:'된소리'   },
+  { ch:'ㅌ', pos:'치조음',   man:'파열음', str:'거센소리' },
+  { ch:'ㅂ', pos:'양순음',   man:'파열음', str:'예사소리' },
+  { ch:'ㅃ', pos:'양순음',   man:'파열음', str:'된소리'   },
+  { ch:'ㅍ', pos:'양순음',   man:'파열음', str:'거센소리' },
+  { ch:'ㅈ', pos:'경구개음', man:'파찰음', str:'예사소리' },
+  { ch:'ㅉ', pos:'경구개음', man:'파찰음', str:'된소리'   },
+  { ch:'ㅊ', pos:'경구개음', man:'파찰음', str:'거센소리' },
+  { ch:'ㅅ', pos:'치조음',   man:'마찰음', str:'예사소리' },
+  { ch:'ㅆ', pos:'치조음',   man:'마찰음', str:'된소리'   },
+  { ch:'ㅎ', pos:'후음',     man:'마찰음', str:null       },
+  { ch:'ㄴ', pos:'치조음',   man:'비음',   str:null       },
+  { ch:'ㅁ', pos:'양순음',   man:'비음',   str:null       },
+  { ch:'ㅇ', pos:'연구개음', man:'비음',   str:null       },
+  { ch:'ㄹ', pos:'치조음',   man:'유음',   str:null       },
+];
+
+/* h = 혀의 높이(고/중/저모음), fb = 전후설, r = 원순/평순 */
+const VOWELS = [
+  { ch:'ㅣ', h:'고모음', fb:'전설모음', r:'평순모음' },
+  { ch:'ㅔ', h:'중모음', fb:'전설모음', r:'평순모음' },
+  { ch:'ㅐ', h:'저모음', fb:'전설모음', r:'평순모음' },
+  { ch:'ㅟ', h:'고모음', fb:'전설모음', r:'원순모음' },
+  { ch:'ㅚ', h:'중모음', fb:'전설모음', r:'원순모음' },
+  { ch:'ㅡ', h:'고모음', fb:'후설모음', r:'평순모음' },
+  { ch:'ㅓ', h:'중모음', fb:'후설모음', r:'평순모음' },
+  { ch:'ㅏ', h:'저모음', fb:'후설모음', r:'평순모음' },
+  { ch:'ㅜ', h:'고모음', fb:'후설모음', r:'원순모음' },
+  { ch:'ㅗ', h:'중모음', fb:'후설모음', r:'원순모음' },
+];
+
+/* =========================================================================
+   2. 미션 정의 (요청하신 17종 그대로)
+   -------------------------------------------------------------------------
+   각 미션은 { id, group, label, hint, dimKey, dimValue, pool } 형태.
+   pool = 이 미션에서 등장 가능한 글자 후보군(정답+오답 포함되는 전체 집합)
+   ========================================================================= */
+function makeMission(id, group, label, hint, dimKey, dimValue, pool) {
+  const target = pool.filter(x => x[dimKey] === dimValue).map(x => x.ch);
+  return { id, group, label, hint, dimKey, dimValue, pool, target };
+}
+
+const CONS_ALL = CONSONANTS;
+const CONS_HAS_STR = CONSONANTS.filter(c => c.str !== null); // 세기 구분 있는 자음만(ㅎ 제외)
+const VOW_ALL = VOWELS;
+
+const MISSIONS = [
+  makeMission('str1','자음','예사소리를 모두 잡으세요!','부드럽고 평범하게 나는 소리예요.','str','예사소리', CONS_HAS_STR),
+  makeMission('str2','자음','된소리를 모두 잡으세요!','힘을 꽉 주어 딱딱하게 내는 소리예요.','str','된소리', CONS_HAS_STR),
+  makeMission('str3','자음','거센소리를 모두 잡으세요!','숨을 세게 내쉬며 내는 소리예요.','str','거센소리', CONS_HAS_STR),
+  makeMission('man1','자음','비음을 모두 잡으세요!','코로 공기를 내보내는 콧소리예요.','man','비음', CONS_ALL),
+  makeMission('man2','자음','유음을 모두 잡으세요!','혀를 굴리듯 흘려 내는 소리, 딱 하나!','man','유음', CONS_ALL),
+  makeMission('pos1','자음','양순음을 모두 잡으세요!','두 입술에서 나는 소리예요.','pos','양순음', CONS_ALL),
+  makeMission('pos2','자음','치조음을 모두 잡으세요!','혀끝이 윗잇몸에 닿는 소리예요.','pos','치조음', CONS_ALL),
+  makeMission('pos3','자음','경구개음을 모두 잡으세요!','혀와 센입천장 사이에서 나는 소리예요.','pos','경구개음', CONS_ALL),
+  makeMission('pos4','자음','연구개음을 모두 잡으세요!','혀뒤와 여린입천장 사이에서 나는 소리예요.','pos','연구개음', CONS_ALL),
+  makeMission('pos5','자음','후음을 모두 잡으세요!','목청 사이(목구멍)에서 나는 소리, 딱 하나!','pos','후음', CONS_ALL),
+  makeMission('fb1','모음','전설모음을 모두 잡으세요!','혀의 앞부분에서 나는 소리예요.','fb','전설모음', VOW_ALL),
+  makeMission('fb2','모음','후설모음을 모두 잡으세요!','혀의 뒷부분에서 나는 소리예요.','fb','후설모음', VOW_ALL),
+  makeMission('h1','모음','고모음을 모두 잡으세요!','혀의 위치가 높아 입이 조금만 벌어져요.','h','고모음', VOW_ALL),
+  makeMission('h2','모음','중모음을 모두 잡으세요!','혀의 높이가 중간 정도예요.','h','중모음', VOW_ALL),
+  makeMission('h3','모음','저모음을 모두 잡으세요!','혀의 위치가 낮아 입이 크게 벌어져요.','h','저모음', VOW_ALL),
+  makeMission('r1','모음','원순모음을 모두 잡으세요!','입술을 동그랗게 오므려 내는 소리예요.','r','원순모음', VOW_ALL),
+  makeMission('r2','모음','평순모음을 모두 잡으세요!','입술을 오므리지 않고 평평하게 내는 소리예요.','r','평순모음', VOW_ALL),
+];
+
+/* 오답 설명 문장 생성기
+   - 자음 이름(기역/니은/…)은 모두 받침으로 끝나므로 항상 "은"을 사용.
+   - 모음 이름(아/어/오/…)은 모두 받침이 없으므로 항상 "는"을 사용. */
+function explainWrong(letterObj, mission) {
+  const josa = mission.group === '자음' ? '은' : '는';
+  const actualValue = letterObj[mission.dimKey];
+  const valueText = actualValue === null ? '해당 분류가 없는 소리' : actualValue;
+  return `❌ "${letterObj.ch}"${josa} ${valueText}입니다.`;
+}
+
+/* =========================================================================
+   3. 게임 상태
+   ========================================================================= */
+const WORLD_W = 1000, WORLD_H = 600; // 논리 좌표계 크기(5:3 비율)
+
+const state = {
+  mode: 'normal',            // 'normal' | 'time' | 'practice'
+  missionQueue: [],
+  missionIndex: 0,
+  currentMission: null,
+  letters: [],                // 현재 맵 위의 글자들
+  targetsRemaining: 0,
+
+  score: 0,
+  lives: 3,
+  combo: 0,
+  maxCombo: 0,
+
+  correctTotal: 0,
+  wrongTotal: 0,
+  wrongByMission: {},         // { missionLabel: count } - 종료 후 통계용
+
+  player: { x: WORLD_W/2, y: WORLD_H/2, size: 60 },
+  keys: { up:false, down:false, left:false, right:false },
+  catchCooldownUntil: 0,
+
+  timeAttack: { remaining: 30, limit: 30 },
+
+  achievements: new Set(),    // 이번 플레이에서 획득한 업적 id
+  running: false,
+  lastTs: 0,
+};
+
+/* 업적 정의 */
+const ACHIEVEMENTS = [
+  { id:'combo5',   name:'🔥 콤보왕',    desc:'콤보 5 달성' },
+  { id:'vowelPhd', name:'🎓 모음 박사', desc:'모음 미션 전체 클리어' },
+  { id:'consMaster',name:'🥋 자음 마스터', desc:'자음 미션 전체 클리어' },
+  { id:'perfect',  name:'💎 퍼펙트 헌터', desc:'오답 없이 게임 완주' },
+  { id:'finisher', name:'🏁 완주자',    desc:'게임을 끝까지 플레이함' },
+];
+
+/* =========================================================================
+   4. 맵(정적 오브젝트) 초기화
+   -------------------------------------------------------------------------
+   나무/바위/연못은 플레이어 이동을 막는 "충돌 오브젝트".
+   꽃은 장식용(충돌 없음).
+   ========================================================================= */
+const OBSTACLES = [
+  { type:'tree', x:70,  y:70,  w:70, h:90, emoji:'🌳' },
+  { type:'tree', x:930, y:80,  w:70, h:90, emoji:'🌳' },
+  { type:'tree', x:60,  y:500, w:70, h:90, emoji:'🌳' },
+  { type:'rock', x:500, y:60,  w:60, h:50, emoji:'🪨' },
+  { type:'rock', x:920, y:480, w:60, h:50, emoji:'🪨' },
+  { type:'pond', x:760, y:420, w:200,h:140, emoji:'' },
+];
+const FLOWERS = [
+  {x:180,y:150,e:'🌸'}, {x:260,y:480,e:'🌼'}, {x:620,y:150,e:'🌻'},
+  {x:430,y:520,e:'🌸'}, {x:820,y:180,e:'🌼'}, {x:130,y:330,e:'🌻'},
+  {x:560,y:330,e:'🌸'},
+];
+
+function pctX(x){ return (x / WORLD_W * 100) + '%'; }
+function pctY(y){ return (y / WORLD_H * 100) + '%'; }
+
+function renderStaticMap() {
+  const world = document.getElementById('world');
+  // 기존 장식 요소 제거(재시작 대비) 후 다시 그림
+  world.querySelectorAll('.mapObj').forEach(el => el.remove());
+
+  OBSTACLES.forEach(o => {
+    const el = document.createElement('div');
+    el.className = 'mapObj ' + o.type;
+    el.style.left = pctX(o.x); el.style.top = pctY(o.y);
+    el.style.width = pctX(o.w).replace('%','') + '%';
+    el.style.height = pctY(o.h).replace('%','') + '%';
+    el.style.transform = 'translate(-50%,-50%)';
+    if (o.emoji) el.textContent = o.emoji;
+    world.insertBefore(el, document.getElementById('player'));
+  });
+  FLOWERS.forEach(f => {
+    const el = document.createElement('div');
+    el.className = 'mapObj flower';
+    el.style.left = pctX(f.x); el.style.top = pctY(f.y);
+    el.style.transform = 'translate(-50%,-50%)';
+    el.textContent = f.e;
+    world.insertBefore(el, document.getElementById('player'));
+  });
+}
+
+/* 사각형 충돌 검사 (플레이어 이동 제한용) */
+function rectsOverlap(ax,ay,aw,ah, bx,by,bw,bh) {
+  return Math.abs(ax-bx) < (aw+bw)/2 && Math.abs(ay-by) < (ah+bh)/2;
+}
+function collidesWithObstacle(x, y, size) {
+  for (const o of OBSTACLES) {
+    if (rectsOverlap(x,y,size,size, o.x,o.y,o.w,o.h)) return true;
+  }
+  return false;
+}
+
+/* =========================================================================
+   5. 시작 화면 로직
+   ========================================================================= */
+const startScreen = document.getElementById('startScreen');
+let selectedMode = 'normal';
+
+document.querySelectorAll('.modeCard').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.modeCard').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedMode = card.dataset.mode;
+    document.getElementById('practiceSelectWrap').style.display =
+      selectedMode === 'practice' ? 'block' : 'none';
+  });
+});
+
+/* 연습 모드용 미션 선택 드롭다운 채우기 */
+const practiceSelect = document.getElementById('practiceMissionSelect');
+MISSIONS.forEach(m => {
+  const opt = document.createElement('option');
+  opt.value = m.id;
+  opt.textContent = `[${m.group}] ${m.label.replace('을 모두 잡으세요!','').replace('를 모두 잡으세요!','')}`;
+  practiceSelect.appendChild(opt);
+});
+
+document.getElementById('startGameBtn').addEventListener('click', () => {
+  startScreen.style.display = 'none';
+  startGame(selectedMode);
+});
+
+/* =========================================================================
+   6. 게임 시작 / 미션 진행
+   ========================================================================= */
+function shuffle(arr){
+  const a = arr.slice();
+  for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+function startGame(mode) {
+  state.mode = mode;
+  state.score = 0; state.lives = 3; state.combo = 0; state.maxCombo = 0;
+  state.correctTotal = 0; state.wrongTotal = 0; state.wrongByMission = {};
+  state.achievements = new Set();
+  state.player.x = WORLD_W/2; state.player.y = WORLD_H/2;
+
+  if (mode === 'practice') {
+    const chosenId = practiceSelect.value;
+    const m = MISSIONS.find(x => x.id === chosenId);
+    state.missionQueue = [m]; // 연습모드는 같은 미션을 계속 반복
+  } else {
+    state.missionQueue = shuffle(MISSIONS);
+  }
+  state.missionIndex = 0;
+
+  renderStaticMap();
+  updateHUDVisibility();
+  loadMission(state.missionQueue[0]);
+
+  state.running = true;
+  state.lastTs = performance.now();
+  requestAnimationFrame(gameLoop);
+}
+
+function updateHUDVisibility() {
+  document.getElementById('timeAttackBar').style.display = state.mode === 'time' ? 'block' : 'none';
+  renderLives();
+}
+
+function renderLives() {
+  const wrap = document.getElementById('livesWrap');
+  if (state.mode === 'practice') { wrap.textContent = '∞'; return; }
+  wrap.textContent = '❤️'.repeat(Math.max(0,state.lives));
+}
+
+function loadMission(mission) {
+  state.currentMission = mission;
+  document.getElementById('missionMain').textContent = mission.label;
+  document.getElementById('missionHint').textContent = mission.hint;
+
+  // 기존 글자 제거
+  state.letters.forEach(l => l.el.remove());
+  state.letters = [];
+
+  // 정답 글자 + 오답(방해) 글자 스폰
+  const targetChars = mission.target.slice();
+  const distractorPool = mission.pool.filter(x => !mission.target.includes(x.ch));
+  const distractorCount = Math.min(distractorPool.length, 7);
+  const distractors = shuffle(distractorPool).slice(0, distractorCount);
+
+  const world = document.getElementById('world');
+  const playerEl = document.getElementById('player');
+
+  function spawnOne(charObj, isTarget) {
+    let x, y, tries = 0;
+    do {
+      x = 60 + Math.random() * (WORLD_W - 120);
+      y = 60 + Math.random() * (WORLD_H - 120);
+      tries++;
+    } while (collidesWithObstacle(x,y,60) && tries < 20);
+
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 30 + Math.random() * 25; // 논리단위/초 - 천천히 이동
+    const el = document.createElement('div');
+    el.className = 'letter ' + (mission.group === '자음' ? 'consonant' : 'vowel');
+    el.textContent = charObj.ch;
+    world.insertBefore(el, playerEl);
+
+    state.letters.push({
+      ch: charObj.ch, data: charObj, isTarget, el,
+      x, y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed,
+      cooldownUntil: 0, caught:false,
+    });
+  }
+
+  targetChars.forEach(ch => spawnOne(mission.pool.find(p=>p.ch===ch), true));
+  distractors.forEach(d => spawnOne(d, false));
+
+  state.targetsRemaining = targetChars.length;
+  document.getElementById('remainVal').textContent = state.targetsRemaining;
+
+  if (state.mode === 'time') {
+    state.timeAttack.remaining = state.timeAttack.limit;
+    document.getElementById('timeAttackFill').style.width = '100%';
+  }
+}
+
+function nextMission() {
+  if (state.mode === 'practice') {
+    // 연습모드는 같은 미션을 다시 로드(계속 반복 학습)
+    loadMission(state.currentMission);
+    return;
+  }
+  state.missionIndex++;
+  if (state.missionIndex >= state.missionQueue.length) {
+    endGame(true);
+    return;
+  }
+  loadMission(state.missionQueue[state.missionIndex]);
+}
+
+/* =========================================================================
+   7. 게임 루프
+   ========================================================================= */
+function gameLoop(ts) {
+  if (!state.running) return;
+  const dt = Math.min(0.05, (ts - state.lastTs) / 1000); // 초 단위, 최대 50ms로 클램프
+  state.lastTs = ts;
+
+  updatePlayer(dt);
+  updateLetters(dt);
+  if (state.mode === 'time') updateTimeAttack(dt);
+  updateNearestHighlight();
+  render();
+
+  requestAnimationFrame(gameLoop);
+}
+
+/* ---- 플레이어 이동 ---- */
+const PLAYER_SPEED = 260; // 논리단위 / 초
+function updatePlayer(dt) {
+  let dx = 0, dy = 0;
+  if (state.keys.up) dy -= 1;
+  if (state.keys.down) dy += 1;
+  if (state.keys.left) dx -= 1;
+  if (state.keys.right) dx += 1;
+
+  const moving = dx !== 0 || dy !== 0;
+  document.getElementById('player').classList.toggle('moving', moving);
+  if (!moving) return;
+
+  const len = Math.hypot(dx,dy) || 1;
+  dx = dx/len * PLAYER_SPEED * dt;
+  dy = dy/len * PLAYER_SPEED * dt;
+
+  const p = state.player;
+  const nx = clamp(p.x + dx, 30, WORLD_W-30);
+  const ny = clamp(p.y + dy, 30, WORLD_H-30);
+
+  // X, Y 축을 분리해서 충돌 검사(벽에 자연스럽게 미끄러지도록)
+  if (!collidesWithObstacle(nx, p.y, p.size*0.6)) p.x = nx;
+  if (!collidesWithObstacle(p.x, ny, p.size*0.6)) p.y = ny;
+}
+function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+
+/* ---- 글자 이동 & 겹침 방지 ---- */
+function updateLetters(dt) {
+  const letters = state.letters;
+  for (const l of letters) {
+    if (l.caught) continue;
+    l.x += l.vx * dt; l.y += l.vy * dt;
+
+    // 벽 반사
+    if (l.x < 40) { l.x = 40; l.vx *= -1; }
+    if (l.x > WORLD_W-40) { l.x = WORLD_W-40; l.vx *= -1; }
+    if (l.y < 40) { l.y = 40; l.vy *= -1; }
+    if (l.y > WORLD_H-40) { l.y = WORLD_H-40; l.vy *= -1; }
+  }
+  // 글자끼리 너무 가까우면 서로 밀어내기(단순 반발) - 겹침 방지
+  for (let i=0;i<letters.length;i++){
+    if (letters[i].caught) continue;
+    for (let j=i+1;j<letters.length;j++){
+      if (letters[j].caught) continue;
+      const a = letters[i], b = letters[j];
+      const dist = Math.hypot(a.x-b.x, a.y-b.y);
+      const minDist = 70;
+      if (dist < minDist && dist > 0) {
+        const push = (minDist - dist) / minDist * 40 * dt * 60;
+        const nx = (a.x-b.x)/dist, ny = (a.y-b.y)/dist;
+        a.x += nx*push; a.y += ny*push;
+        b.x -= nx*push; b.y -= ny*push;
+      }
+    }
+  }
+}
+
+/* ---- 타임어택 카운트다운 ---- */
+function updateTimeAttack(dt) {
+  state.timeAttack.remaining -= dt;
+  const ratio = Math.max(0, state.timeAttack.remaining / state.timeAttack.limit);
+  document.getElementById('timeAttackFill').style.width = (ratio*100) + '%';
+  if (state.timeAttack.remaining <= 0) {
+    // 시간 초과: 생명 감소 후 다음 미션(연습모드는 이 분기 진입 안 함)
+    loseLife('⏱️ 시간 초과!');
+    if (state.running) nextMission();
+  }
+}
+
+/* ---- 가까운 글자 하이라이트(잡을 수 있음을 시각적으로 표시) ---- */
+const CATCH_RADIUS = 85;
+function nearestCatchableLetter() {
+  const p = state.player;
+  let best = null, bestDist = Infinity;
+  for (const l of state.letters) {
+    if (l.caught) continue;
+    const dist = Math.hypot(p.x-l.x, p.y-l.y);
+    if (dist < CATCH_RADIUS && dist < bestDist) { best = l; bestDist = dist; }
+  }
+  return best;
+}
+function updateNearestHighlight() {
+  const near = nearestCatchableLetter();
+  for (const l of state.letters) l.el.classList.toggle('nearReady', l === near);
+}
+
+/* ---- 화면 렌더링(위치 반영) ---- */
+function render() {
+  const p = document.getElementById('player');
+  p.style.left = pctX(state.player.x);
+  p.style.top = pctY(state.player.y);
+  for (const l of state.letters) {
+    if (l.caught) continue;
+    l.el.style.left = pctX(l.x);
+    l.el.style.top = pctY(l.y);
+  }
+}
+
+/* =========================================================================
+   8. 입력 처리 (키보드 + 터치)
+   ========================================================================= */
+window.addEventListener('keydown', (e) => {
+  switch (e.key) {
+    case 'w': case 'W': case 'ArrowUp': state.keys.up = true; break;
+    case 's': case 'S': case 'ArrowDown': state.keys.down = true; break;
+    case 'a': case 'A': case 'ArrowLeft': state.keys.left = true; break;
+    case 'd': case 'D': case 'ArrowRight': state.keys.right = true; break;
+    case ' ': case 'Enter':
+      e.preventDefault();
+      attemptCatch();
+      break;
+  }
+});
+window.addEventListener('keyup', (e) => {
+  switch (e.key) {
+    case 'w': case 'W': case 'ArrowUp': state.keys.up = false; break;
+    case 's': case 'S': case 'ArrowDown': state.keys.down = false; break;
+    case 'a': case 'A': case 'ArrowLeft': state.keys.left = false; break;
+    case 'd': case 'D': case 'ArrowRight': state.keys.right = false; break;
+  }
+});
+
+/* 터치/마우스용 D패드 (누르고 있는 동안 이동) */
+function bindHold(id, key) {
+  const el = document.getElementById(id);
+  const on = (e) => { e.preventDefault(); state.keys[key] = true; };
+  const off = (e) => { state.keys[key] = false; };
+  el.addEventListener('touchstart', on, {passive:false});
+  el.addEventListener('touchend', off);
+  el.addEventListener('mousedown', on);
+  el.addEventListener('mouseup', off);
+  el.addEventListener('mouseleave', off);
+}
+bindHold('dUp','up'); bindHold('dDown','down'); bindHold('dLeft','left'); bindHold('dRight','right');
+
+document.getElementById('catchBtn').addEventListener('touchstart', (e)=>{ e.preventDefault(); attemptCatch(); }, {passive:false});
+document.getElementById('catchBtn').addEventListener('mousedown', attemptCatch);
+
+/* =========================================================================
+   9. 잡기 판정 (정답 / 오답)
+   ========================================================================= */
+function attemptCatch() {
+  if (!state.running) return;
+  const now = performance.now();
+  if (now < state.catchCooldownUntil) return; // 연타 방지 쿨다운
+
+  const target = nearestCatchableLetter();
+  if (!target) return;
+
+  state.catchCooldownUntil = now + 350;
+
+  if (target.isTarget) correctCatch(target);
+  else wrongCatch(target);
+}
+
+function correctCatch(letter) {
+  letter.caught = true;
+  letter.el.classList.add('catchSuccess');
+  spawnFloatPop(letter.x, letter.y, '⭐ 잡았다! +10', '#fff59d');
+  beep(880, 0.08);
+
+  state.combo++;
+  state.maxCombo = Math.max(state.maxCombo, state.combo);
+  const comboBonus = Math.min(20, state.combo * 2); // 콤보가 쌓일수록 추가 점수(최대+20)
+  state.score += 10 + comboBonus;
+  state.correctTotal++;
+  state.targetsRemaining--;
+
+  updateComboBadge();
+  document.getElementById('scoreVal').textContent = state.score;
+  document.getElementById('remainVal').textContent = Math.max(0,state.targetsRemaining);
+
+  checkAchievement('combo5', state.combo >= 5);
+
+  setTimeout(() => letter.el.remove(), 420);
+
+  if (state.targetsRemaining <= 0) {
+    checkMissionGroupAchievements();
+    setTimeout(nextMission, 500);
+  }
+}
+
+function wrongCatch(letter) {
+  letter.el.classList.add('catchFail');
+  setTimeout(() => letter.el.classList.remove('catchFail'), 400);
+  letter.cooldownUntil = performance.now() + 1200;
+  beep(180, 0.14);
+
+  showExplainToast(explainWrong(letter.data, state.currentMission));
+
+  state.combo = 0;
+  updateComboBadge();
+  state.wrongTotal++;
+  const label = state.currentMission.label;
+  state.wrongByMission[label] = (state.wrongByMission[label] || 0) + 1;
+
+  loseLife();
+}
+
+function loseLife(reasonText) {
+  if (state.mode === 'practice') return; // 연습모드는 목숨이 없음
+  state.lives--;
+  renderLives();
+  if (reasonText) showExplainToast(reasonText);
+  if (state.lives <= 0) endGame(false);
+}
+
+function updateComboBadge() {
+  const badge = document.getElementById('comboBadge');
+  document.getElementById('comboVal').textContent = state.combo;
+  badge.style.display = state.combo >= 2 ? 'flex' : 'none';
+}
+
+/* ---- 팝업/토스트 유틸 ---- */
+function spawnFloatPop(x, y, text, color) {
+  const world = document.getElementById('world');
+  const el = document.createElement('div');
+  el.className = 'floatPop';
+  el.style.left = pctX(x); el.style.top = pctY(y);
+  el.style.color = color || '#fff';
+  el.textContent = text;
+  world.appendChild(el);
+  setTimeout(() => el.remove(), 820);
+}
+
+let explainTimer = null;
+function showExplainToast(text) {
+  const el = document.getElementById('explainToast');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(explainTimer);
+  explainTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+/* =========================================================================
+   10. 업적 시스템
+   ========================================================================= */
+function checkAchievement(id, condition) {
+  if (condition && !state.achievements.has(id)) {
+    state.achievements.add(id);
+    const def = ACHIEVEMENTS.find(a => a.id === id);
+    showAchieveToast(`🏅 업적 달성! ${def.name}`);
+  }
+}
+
+function checkMissionGroupAchievements() {
+  // 지금까지 완료한 미션들의 그룹을 확인해 모음/자음 전체 클리어 업적 판정
+  if (state.mode === 'practice') return;
+  const cleared = state.missionQueue.slice(0, state.missionIndex+1);
+  const vowelMissions = MISSIONS.filter(m => m.group === '모음');
+  const consMissions = MISSIONS.filter(m => m.group === '자음');
+  const clearedIds = new Set(cleared.map(m => m.id));
+  const allVowelsCleared = vowelMissions.every(m => clearedIds.has(m.id));
+  const allConsCleared = consMissions.every(m => clearedIds.has(m.id));
+  checkAchievement('vowelPhd', allVowelsCleared);
+  checkAchievement('consMaster', allConsCleared);
+}
+
+let achieveTimer = null;
+function showAchieveToast(text) {
+  const el = document.getElementById('achieveToast');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(achieveTimer);
+  achieveTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* =========================================================================
+   11. 게임 종료 / 결과 화면
+   ========================================================================= */
+function endGame(cleared) {
+  state.running = false;
+
+  checkAchievement('finisher', true);
+  checkAchievement('perfect', state.wrongTotal === 0);
+
+  const totalAttempts = state.correctTotal + state.wrongTotal;
+  const accuracy = totalAttempts > 0 ? Math.round((state.correctTotal/totalAttempts)*100) : 100;
+
+  // 가장 많이 틀린 분류 찾기
+  let worst = '-', worstCount = 0;
+  Object.entries(state.wrongByMission).forEach(([label,count]) => {
+    if (count > worstCount) { worst = label; worstCount = count; }
+  });
+
+  document.getElementById('endTitle').textContent = cleared ? '🏆 모든 미션 클리어!' : '💫 게임 종료';
+  document.getElementById('endScore').textContent = state.score + '점';
+  document.getElementById('endAccuracy').textContent = accuracy + '%';
+  document.getElementById('endMaxCombo').textContent = state.maxCombo;
+  document.getElementById('endWorstCat').textContent = worst === '-' ? '없음 (완벽!)' : `${worst} (${worstCount}회)`;
+
+  // 업적 목록 렌더링
+  const list = document.getElementById('achieveList');
+  list.innerHTML = '';
+  ACHIEVEMENTS.forEach(a => {
+    const chip = document.createElement('div');
+    const got = state.achievements.has(a.id);
+    chip.className = 'achieveChip' + (got ? '' : ' locked');
+    chip.textContent = (got ? a.name : '🔒 ' + a.name);
+    chip.title = a.desc;
+    list.appendChild(chip);
+  });
+
+  // 오답 분류 표
+  const table = document.getElementById('wrongTable');
+  const rows = Object.entries(state.wrongByMission).sort((a,b)=>b[1]-a[1]);
+  table.innerHTML = '<tr><th>미션</th><th>오답 횟수</th></tr>' +
+    (rows.length ? rows.map(([label,count]) => `<tr><td>${label}</td><td>${count}</td></tr>`).join('')
+                 : '<tr><td colspan="2">오답이 없어요! 완벽해요 💎</td></tr>');
+
+  document.getElementById('endScreen').style.display = 'flex';
+}
+
+document.getElementById('retryBtn').addEventListener('click', () => {
+  document.getElementById('endScreen').style.display = 'none';
+  startGame(state.mode);
+});
+document.getElementById('menuBtn').addEventListener('click', () => {
+  document.getElementById('endScreen').style.display = 'none';
+  startScreen.style.display = 'flex';
+});
+
+/* =========================================================================
+   사운드: 외부 파일 없이 Web Audio API로 아주 짧은 효과음만 생성(초경량)
+   ========================================================================= */
+let audioCtx;
+function beep(freq, dur) {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + dur);
+  } catch (e) { /* 오디오 미지원 환경은 조용히 무시 */ }
+}
+
+})();
+</script>
+</body>
+</html>
